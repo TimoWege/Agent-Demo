@@ -13,7 +13,7 @@ variable "instance_type" {
 variable "key_pair_name" {
   description = "Name for the generated AWS key pair"
   type        = string
-  default     = "timo-demo-key"
+  default     = "demo-key"
 }
 
 variable "hostname_1" {

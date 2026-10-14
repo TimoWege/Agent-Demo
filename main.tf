@@ -68,10 +68,11 @@ data "aws_ami" "windows" {
 data "aws_caller_identity" "current" {}
 
 # --- Installer staging: TMSensorAgent_Windows_x86_64.exe is uploaded to a private ---
-# --- S3 bucket; timo-1 pulls it down via an IAM instance role and runs it.        ---
+# --- S3 bucket; the first instance pulls it down via an IAM instance role and     ---
+# --- runs it.                                                                    ---
 
 resource "aws_s3_bucket" "installers" {
-  bucket        = "timo-demo-installers-${data.aws_caller_identity.current.account_id}"
+  bucket        = "demo-installers-${data.aws_caller_identity.current.account_id}"
   force_destroy = true
 }
 
@@ -90,8 +91,8 @@ resource "aws_s3_object" "sensor_agent" {
   source_hash = filemd5("${path.module}/tools/TMSensorAgent_Windows_x86_64.exe")
 }
 
-resource "aws_iam_role" "timo1_s3_read" {
-  name = "timo1-sensor-agent-s3-read"
+resource "aws_iam_role" "instance1_s3_read" {
+  name = "instance1-sensor-agent-s3-read"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -103,9 +104,9 @@ resource "aws_iam_role" "timo1_s3_read" {
   })
 }
 
-resource "aws_iam_role_policy" "timo1_s3_read" {
+resource "aws_iam_role_policy" "instance1_s3_read" {
   name = "read-sensor-agent-object"
-  role = aws_iam_role.timo1_s3_read.id
+  role = aws_iam_role.instance1_s3_read.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -117,9 +118,9 @@ resource "aws_iam_role_policy" "timo1_s3_read" {
   })
 }
 
-resource "aws_iam_instance_profile" "timo1_s3_read" {
-  name = "timo1-sensor-agent-s3-read"
-  role = aws_iam_role.timo1_s3_read.name
+resource "aws_iam_instance_profile" "instance1_s3_read" {
+  name = "instance1-sensor-agent-s3-read"
+  role = aws_iam_role.instance1_s3_read.name
 }
 
 # --- Key pair (generated locally; private key saved next to this config) ---
@@ -143,7 +144,7 @@ resource "aws_key_pair" "demo" {
 # --- Security group: RDP + SSH from my IP only, full egress ---
 
 resource "aws_security_group" "demo" {
-  name        = "timo-demo-sg"
+  name        = "demo-sg"
   description = "Allow RDP+SSH from a single admin IP, full egress"
   vpc_id      = data.aws_vpc.default.id
 
@@ -172,20 +173,20 @@ resource "aws_security_group" "demo" {
   }
 
   tags = {
-    Name = "timo-demo-sg"
+    Name = "demo-sg"
   }
 }
 
 # --- Instances ---
 
-resource "aws_instance" "timo1" {
+resource "aws_instance" "instance1" {
   ami                         = data.aws_ami.windows.id
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
   vpc_security_group_ids      = [aws_security_group.demo.id]
   key_name                    = aws_key_pair.demo.key_name
   get_password_data           = true
-  iam_instance_profile        = aws_iam_instance_profile.timo1_s3_read.name
+  iam_instance_profile        = aws_iam_instance_profile.instance1_s3_read.name
   user_data_replace_on_change = true
 
   user_data = <<-EOT
@@ -205,7 +206,7 @@ tags = {
 }
 }
 
-resource "aws_instance" "timo2" {
+resource "aws_instance" "instance2" {
   ami                         = data.aws_ami.windows.id
   instance_type               = var.instance_type
   subnet_id                   = data.aws_subnets.default.ids[0]
@@ -231,34 +232,34 @@ resource "aws_instance" "timo2" {
 # client - it is never written to disk and never appears in `ps`. Window opens
 # non-fullscreen (no /f flag).
 
-resource "local_file" "connect_timo1" {
+resource "local_file" "connect_instance1" {
   filename        = "${path.module}/connect-${var.hostname_1}.sh"
   file_permission = "0755"
   content         = <<-EOT
     #!/bin/bash
     set -euo pipefail
     DIR="$(cd "$(dirname "$${BASH_SOURCE[0]}")" && pwd)"
-    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.timo1.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
+    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance1.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
     if [ -z "$PASSWORD" ] || [ "$PASSWORD" = "None" ]; then
       echo "Password not available yet (AWS needs a few minutes after boot to generate it). Try again shortly." >&2
       exit 1
     fi
-    echo "$PASSWORD" | sdl-freerdp /v:${aws_instance.timo1.public_ip} /u:Administrator /from-stdin:force /w:1600 /h:1000 /cert:ignore +clipboard
+    echo "$PASSWORD" | sdl-freerdp /v:${aws_instance.instance1.public_ip} /u:Administrator /from-stdin:force /w:1600 /h:1000 /cert:ignore +clipboard
   EOT
 }
 
-resource "local_file" "connect_timo2" {
+resource "local_file" "connect_instance2" {
   filename        = "${path.module}/connect-${var.hostname_2}.sh"
   file_permission = "0755"
   content         = <<-EOT
     #!/bin/bash
     set -euo pipefail
     DIR="$(cd "$(dirname "$${BASH_SOURCE[0]}")" && pwd)"
-    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.timo2.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
+    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance2.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
     if [ -z "$PASSWORD" ] || [ "$PASSWORD" = "None" ]; then
       echo "Password not available yet (AWS needs a few minutes after boot to generate it). Try again shortly." >&2
       exit 1
     fi
-    echo "$PASSWORD" | sdl-freerdp /v:${aws_instance.timo2.public_ip} /u:Administrator /from-stdin:force /w:1600 /h:1000 /cert:ignore +clipboard
+    echo "$PASSWORD" | sdl-freerdp /v:${aws_instance.instance2.public_ip} /u:Administrator /from-stdin:force /w:1600 /h:1000 /cert:ignore +clipboard
   EOT
 }

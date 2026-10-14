@@ -115,7 +115,7 @@ terraform apply
 
 Other optional overrides: `aws_region` (default `eu-central-1`),
 `instance_type` (default `t3.medium`), `key_pair_name` (default
-`timo-demo-key`).
+`demo-key`).
 
 ## Using it
 
@@ -166,4 +166,5 @@ role/instance profile, and the S3 bucket (including the uploaded installer).
   args — the connect scripts fetch the password live and pipe it to
   `sdl-freerdp` over stdin.
 - The S3 bucket is private (public access fully blocked) and the IAM role
-  on timo-1 can only `s3:GetObject` the one installer key — nothing else.
+  on the first instance can only `s3:GetObject` the one installer key —
+  nothing else.
