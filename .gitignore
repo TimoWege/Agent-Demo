@@ -1,0 +1,23 @@
+# Terraform local state & plans - contain secrets (private key in plaintext) and account details
+*.tfstate
+*.tfstate.*
+tfplan
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform/
+
+# Generated secrets / connection artifacts - never commit
+*.pem
+*.key
+connect-timo-*.sh
+
+# Large proprietary installer binaries - not suitable for this repo
+tools/
+*.exe
+
+# macOS
+.DS_Store
