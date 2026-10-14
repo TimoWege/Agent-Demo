@@ -196,32 +196,33 @@ resource "aws_instance" "timo1" {
   object_key  = aws_s3_object.sensor_agent.key
   region      = var.aws_region
 })}
-    Rename-Computer -NewName "timo-1" -Force -Restart
+    Rename-Computer -NewName "${var.hostname_1}" -Force -Restart
     </powershell>
   EOT
 
 tags = {
-  Name = "timo-1"
+  Name = var.hostname_1
 }
 }
 
 resource "aws_instance" "timo2" {
-  ami                    = data.aws_ami.windows.id
-  instance_type          = var.instance_type
-  subnet_id              = data.aws_subnets.default.ids[0]
-  vpc_security_group_ids = [aws_security_group.demo.id]
-  key_name               = aws_key_pair.demo.key_name
-  get_password_data      = true
+  ami                         = data.aws_ami.windows.id
+  instance_type               = var.instance_type
+  subnet_id                   = data.aws_subnets.default.ids[0]
+  vpc_security_group_ids      = [aws_security_group.demo.id]
+  key_name                    = aws_key_pair.demo.key_name
+  get_password_data           = true
+  user_data_replace_on_change = true
 
   user_data = <<-EOT
     <powershell>
     ${file("${path.module}/scripts/bootstrap-openssh.ps1")}
-    Rename-Computer -NewName "timo-2" -Force -Restart
+    Rename-Computer -NewName "${var.hostname_2}" -Force -Restart
     </powershell>
   EOT
 
   tags = {
-    Name = "timo-2"
+    Name = var.hostname_2
   }
 }
 
@@ -231,7 +232,7 @@ resource "aws_instance" "timo2" {
 # non-fullscreen (no /f flag).
 
 resource "local_file" "connect_timo1" {
-  filename        = "${path.module}/connect-timo-1.sh"
+  filename        = "${path.module}/connect-${var.hostname_1}.sh"
   file_permission = "0755"
   content         = <<-EOT
     #!/bin/bash
@@ -247,7 +248,7 @@ resource "local_file" "connect_timo1" {
 }
 
 resource "local_file" "connect_timo2" {
-  filename        = "${path.module}/connect-timo-2.sh"
+  filename        = "${path.module}/connect-${var.hostname_2}.sh"
   file_permission = "0755"
   content         = <<-EOT
     #!/bin/bash

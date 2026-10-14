@@ -1,14 +1,20 @@
 # Unified Agent Demo
 
 Terraform config that spins up a small AWS demo environment: two Windows
-Server 2022 EC2 instances (`timo-1`, `timo-2`), locked down to RDP/SSH from a
-single admin IP, with `timo-1` automatically installing a Trend Micro sensor
-agent on boot.
+Server 2022 EC2 instances, locked down to RDP/SSH from a single admin IP,
+with the first instance automatically installing a Trend Micro sensor agent
+on boot.
+
+Hostnames are **not hardcoded** — every user of this repo sets their own via
+the `hostname_1` / `hostname_2` variables (see
+[Choosing your own hostnames](#choosing-your-own-hostnames)).
 
 ## What gets created
 
-- **timo-1**, **timo-2** — Windows Server 2022, `t3.medium` (2 vCPU / 4 GiB
-  RAM), default root volume, in the account's default VPC/subnet.
+- **Two Windows Server 2022 instances**, `t3.medium` (2 vCPU / 4 GiB RAM),
+  default root volume, in the account's default VPC/subnet. Their in-OS
+  computer name and the EC2 `Name` tag are set from `var.hostname_1` /
+  `var.hostname_2` (defaults: `demo-1` / `demo-2`).
 - A **security group** allowing RDP (3389) and SSH (22) only from your
   current public IP (re-detected on every `plan`/`apply`), full outbound
   internet access, nothing else inbound.
@@ -17,12 +23,12 @@ agent on boot.
 - A fresh **RSA key pair**, generated locally and registered with AWS (used
   for RDP password decryption; SSH uses password auth with the same
   password).
-- On **timo-1 only**: the sensor agent installer is uploaded to a private S3
-  bucket and pulled down + executed via a scoped IAM instance role (see
-  [Prerequisites](#prerequisites) — you must supply this file).
-- Two local helper scripts, `connect-timo-1.sh` / `connect-timo-2.sh`, that
-  open a windowed RDP session with the password fetched live (never written
-  to disk).
+- On the **first instance only**: the sensor agent installer is uploaded to
+  a private S3 bucket and pulled down + executed via a scoped IAM instance
+  role (see [Prerequisites](#prerequisites) — you must supply this file).
+- Two local helper scripts, `connect-<hostname_1>.sh` / `connect-<hostname_2>.sh`,
+  that open a windowed RDP session with the password fetched live (never
+  written to disk).
 
 ## Prerequisites
 
@@ -77,13 +83,39 @@ terraform plan -out=tfplan
 terraform apply tfplan
 ```
 
-Optional overrides (`terraform.tfvars` or `-var`): `aws_region` (default
-`eu-central-1`), `instance_type` (default `t3.medium`), `key_pair_name`
-(default `timo-demo-key`).
+The apply takes a few minutes: EC2 boot, a ~350 MB S3 download onto the
+first instance, then the agent installer registers itself (polled via a
+registry key, up to 5 minutes) before the hostname is renamed and the
+instance reboots.
 
-The apply takes a few minutes: EC2 boot, a ~350 MB S3 download onto timo-1,
-then the agent installer registers itself (polled via a registry key, up to
-5 minutes) before the hostname is renamed and the instance reboots.
+## Choosing your own hostnames
+
+`hostname_1` and `hostname_2` control the Windows computer name, the EC2
+`Name` tag, and the generated connect script's filename for each instance.
+Don't hardcode your choice into `terraform.tfvars` if you plan to share this
+repo further — use one of these instead, so the defaults stay generic for
+the next person:
+
+```bash
+# one-off, via CLI flags
+terraform apply -var="hostname_1=alice-1" -var="hostname_2=alice-2"
+
+# or persist locally without committing it (gitignored)
+cat > terraform.tfvars.local <<EOF
+hostname_1 = "alice-1"
+hostname_2 = "alice-2"
+EOF
+terraform apply -var-file=terraform.tfvars.local
+
+# or via environment variables
+export TF_VAR_hostname_1="alice-1"
+export TF_VAR_hostname_2="alice-2"
+terraform apply
+```
+
+Other optional overrides: `aws_region` (default `eu-central-1`),
+`instance_type` (default `t3.medium`), `key_pair_name` (default
+`timo-demo-key`).
 
 ## Using it
 
@@ -91,13 +123,13 @@ then the agent installer registers itself (polled via a registry key, up to
 terraform output
 ```
 
-- `rdp_timo_1` / `rdp_timo_2` — path to the generated connect script, e.g.
-  run `./connect-timo-1.sh` to open a windowed RDP session (credentials
-  pre-filled, fetched live from AWS each time).
-- `ssh_timo_1` / `ssh_timo_2` — `ssh Administrator@<ip>`; you'll be prompted
-  for the password.
-- `get_admin_password_timo_1` / `_timo_2` — prints the ready-to-run `aws ec2
-  get-password-data ...` command if you need the raw password.
+- `rdp_instance_1` / `rdp_instance_2` — path to the generated connect
+  script, e.g. run `./connect-<hostname_1>.sh` to open a windowed RDP
+  session (credentials pre-filled, fetched live from AWS each time).
+- `ssh_instance_1` / `ssh_instance_2` — `ssh Administrator@<ip>`; you'll be
+  prompted for the password.
+- `get_admin_password_1` / `get_admin_password_2` — prints the ready-to-run
+  `aws ec2 get-password-data ...` command if you need the raw password.
 
 If the password command returns empty, AWS hasn't finished generating it yet
 (usually ready within a few minutes of first boot) — just retry.
@@ -125,10 +157,11 @@ role/instance profile, and the S3 bucket (including the uploaded installer).
 ## Security notes
 
 - **Never commit** `*.pem`, `terraform.tfstate*`, `tfplan`, `.terraform/`,
-  the `tools/` installer, or the generated `connect-timo-*.sh` scripts —
-  they contain or reference secrets (Terraform state stores the private key
-  in plaintext) and are all excluded via `.gitignore`. Each `git clone`
-  regenerates these locally via `terraform apply`.
+  the `tools/` installer, `terraform.tfvars.local`, or the generated
+  `connect-*.sh` scripts — they contain or reference secrets (Terraform
+  state stores the private key in plaintext) and are all excluded via
+  `.gitignore`. Each `git clone` regenerates these locally via
+  `terraform apply`.
 - RDP/SSH passwords are never written to disk or passed as plaintext CLI
   args — the connect scripts fetch the password live and pipe it to
   `sdl-freerdp` over stdin.

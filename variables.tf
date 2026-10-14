@@ -15,3 +15,15 @@ variable "key_pair_name" {
   type        = string
   default     = "timo-demo-key"
 }
+
+variable "hostname_1" {
+  description = "Windows computer hostname for the first instance"
+  type        = string
+  default     = "demo-1"
+}
+
+variable "hostname_2" {
+  description = "Windows computer hostname for the second instance"
+  type        = string
+  default     = "demo-2"
+}

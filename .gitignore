@@ -13,7 +13,8 @@ override.tf.json
 # Generated secrets / connection artifacts - never commit
 *.pem
 *.key
-connect-timo-*.sh
+connect-*.sh
+terraform.tfvars.local
 
 # Large proprietary installer binaries - not suitable for this repo
 tools/
