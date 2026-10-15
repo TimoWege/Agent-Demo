@@ -75,7 +75,7 @@ data "aws_ami" "windows" {
 
 data "aws_caller_identity" "current" {}
 
-# --- Installer staging: TMSensorAgent_Windows_x86_64.exe is uploaded to a private ---
+# --- Installer staging: TMVisionOneAgent_Windows_x86_64.exe is uploaded to a private ---
 # --- S3 bucket; the first instance pulls it down via an IAM instance role and     ---
 # --- runs it.                                                                    ---
 
@@ -94,9 +94,9 @@ resource "aws_s3_bucket_public_access_block" "installers" {
 
 resource "aws_s3_object" "sensor_agent" {
   bucket      = aws_s3_bucket.installers.id
-  key         = "TMSensorAgent_Windows_x86_64.exe"
-  source      = "${path.module}/tools/TMSensorAgent_Windows_x86_64.exe"
-  source_hash = filemd5("${path.module}/tools/TMSensorAgent_Windows_x86_64.exe")
+  key         = "TMVisionOneAgent_Windows_x86_64.exe"
+  source      = "${path.module}/tools/TMVisionOneAgent_Windows_x86_64.exe"
+  source_hash = filemd5("${path.module}/tools/TMVisionOneAgent_Windows_x86_64.exe")
 }
 
 resource "aws_iam_role" "instance1_s3_read" {

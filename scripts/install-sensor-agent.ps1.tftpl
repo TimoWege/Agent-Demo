@@ -1,8 +1,8 @@
-$installer = "C:\Temp\TMSensorAgent_Windows_x86_64.exe"
+$installer = "C:\Temp\TMVisionOneAgent_Windows_x86_64.exe"
 New-Item -ItemType Directory -Path (Split-Path $installer) -Force | Out-Null
 Read-S3Object -BucketName "${bucket_name}" -Key "${object_key}" -File $installer -Region "${region}"
 
-# TMSensorAgent_Windows_x86_64.exe does not exit on its own - it keeps running as a
+# TMVisionOneAgent_Windows_x86_64.exe does not exit on its own - it keeps running as a
 # supervisor process (spawns Endpoint Basecamp worker processes indefinitely). So we
 # launch it without waiting for exit, and instead poll the registration marker it
 # writes to the registry (same approach the original V1ES/XBC install script used).

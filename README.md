@@ -63,13 +63,13 @@ roles/instance profiles, and an S3 bucket.
 
 ### The sensor agent installer (not included in this repo)
 
-This repo does **not** ship `TMSensorAgent_Windows_x86_64.exe` — it's a
+This repo does **not** ship `TMVisionOneAgent_Windows_x86_64.exe` — it's a
 ~350 MB proprietary binary, too large for Git and not meant to be
-redistributed via a shared repo. Get it from
-`<TODO: internal distribution location>` and place it here:
+redistributed via a shared repo. Get it from the well known PX for the demo
+environment and place it here:
 
 ```
-tools/TMSensorAgent_Windows_x86_64.exe
+tools/TMVisionOneAgent_Windows_x86_64.exe
 ```
 
 Without this file, `terraform apply` will fail when it tries to upload it to
@@ -83,7 +83,7 @@ cd Agent-Demo
 
 # 1. Add the installer (see Prerequisites above)
 mkdir -p tools
-cp /path/to/TMSensorAgent_Windows_x86_64.exe tools/
+cp /path/to/TMVisionOneAgent_Windows_x86_64.exe tools/
 
 # 2. Make sure AWS credentials are set up
 aws sts get-caller-identity
