@@ -33,6 +33,14 @@ data "http" "my_ip" {
 
 locals {
   my_ip_cidr = "${trimspace(data.http.my_ip.response_body)}/32"
+
+  # Shared-account safety: this AWS account may be used by several people at
+  # once, so every resource whose name must be unique within the account is
+  # namespaced with var.deployer to avoid collisions between deployments.
+  security_group_name    = "demo-sg-${var.deployer}"
+  iam_role_name          = "instance1-sensor-agent-s3-read-${var.deployer}"
+  key_pair_name          = "${var.key_pair_name}-${var.deployer}"
+  installers_bucket_name = "demo-installers-${data.aws_caller_identity.current.account_id}-${var.deployer}"
 }
 
 # --- Networking: use the account's default VPC/subnet for this demo ---
@@ -72,7 +80,7 @@ data "aws_caller_identity" "current" {}
 # --- runs it.                                                                    ---
 
 resource "aws_s3_bucket" "installers" {
-  bucket        = "demo-installers-${data.aws_caller_identity.current.account_id}"
+  bucket        = local.installers_bucket_name
   force_destroy = true
 }
 
@@ -92,7 +100,7 @@ resource "aws_s3_object" "sensor_agent" {
 }
 
 resource "aws_iam_role" "instance1_s3_read" {
-  name = "instance1-sensor-agent-s3-read"
+  name = local.iam_role_name
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -119,7 +127,7 @@ resource "aws_iam_role_policy" "instance1_s3_read" {
 }
 
 resource "aws_iam_instance_profile" "instance1_s3_read" {
-  name = "instance1-sensor-agent-s3-read"
+  name = local.iam_role_name
   role = aws_iam_role.instance1_s3_read.name
 }
 
@@ -132,19 +140,19 @@ resource "tls_private_key" "demo" {
 
 resource "local_file" "private_key" {
   content         = tls_private_key.demo.private_key_pem
-  filename        = "${path.module}/${var.key_pair_name}.pem"
+  filename        = "${path.module}/${local.key_pair_name}.pem"
   file_permission = "0600"
 }
 
 resource "aws_key_pair" "demo" {
-  key_name   = var.key_pair_name
+  key_name   = local.key_pair_name
   public_key = tls_private_key.demo.public_key_openssh
 }
 
 # --- Security group: RDP + SSH from my IP only, full egress ---
 
 resource "aws_security_group" "demo" {
-  name        = "demo-sg"
+  name        = local.security_group_name
   description = "Allow RDP+SSH from a single admin IP, full egress"
   vpc_id      = data.aws_vpc.default.id
 
@@ -173,7 +181,7 @@ resource "aws_security_group" "demo" {
   }
 
   tags = {
-    Name = "demo-sg"
+    Name = local.security_group_name
   }
 }
 
@@ -239,7 +247,7 @@ resource "local_file" "connect_instance1" {
     #!/bin/bash
     set -euo pipefail
     DIR="$(cd "$(dirname "$${BASH_SOURCE[0]}")" && pwd)"
-    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance1.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
+    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance1.id} --priv-launch-key "$DIR/${local.key_pair_name}.pem" --query PasswordData --output text)
     if [ -z "$PASSWORD" ] || [ "$PASSWORD" = "None" ]; then
       echo "Password not available yet (AWS needs a few minutes after boot to generate it). Try again shortly." >&2
       exit 1
@@ -255,7 +263,7 @@ resource "local_file" "connect_instance2" {
     #!/bin/bash
     set -euo pipefail
     DIR="$(cd "$(dirname "$${BASH_SOURCE[0]}")" && pwd)"
-    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance2.id} --priv-launch-key "$DIR/${var.key_pair_name}.pem" --query PasswordData --output text)
+    PASSWORD=$(aws ec2 get-password-data --region ${var.aws_region} --instance-id ${aws_instance.instance2.id} --priv-launch-key "$DIR/${local.key_pair_name}.pem" --query PasswordData --output text)
     if [ -z "$PASSWORD" ] || [ "$PASSWORD" = "None" ]; then
       echo "Password not available yet (AWS needs a few minutes after boot to generate it). Try again shortly." >&2
       exit 1
