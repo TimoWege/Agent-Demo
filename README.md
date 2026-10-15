@@ -1,9 +1,11 @@
-# Unified Agent Demo
+# Agent Demo
 
 Terraform config that spins up a small AWS demo environment: two Windows
 Server 2022 EC2 instances, locked down to RDP/SSH from a single admin IP,
-with the first instance automatically installing a Trend Micro sensor agent
-on boot.
+with the first instance automatically installing a sensor agent on boot.
+The agent itself (vendor, registration details) is intentionally not
+identified in this repo — see
+[The sensor agent installer](#the-sensor-agent-installer-not-included-in-this-repo).
 
 Hostnames are **not hardcoded** — every user of this repo sets their own via
 the `hostname_1` / `hostname_2` variables (see
@@ -64,32 +66,47 @@ roles/instance profiles, and an S3 bucket.
 
 ### The sensor agent installer (not included in this repo)
 
-This repo does **not** ship `TMSensorAgent_Windows_x86_64.exe` — it's a
-~350 MB proprietary binary, too large for Git and not meant to be
-redistributed via a public/shared repo. Get it from
-`<TODO: internal distribution location>` and place it here:
+This repo does **not** ship the installer executable — it's a ~350 MB
+proprietary binary, too large for Git and not meant to be redistributed via
+a shared repo. Get it from `<TODO: internal distribution location>` and
+place it under `tools/` (default expected name below, or point
+`installer_local_path` at wherever you put it):
 
 ```
-tools/TMSensorAgent_Windows_x86_64.exe
+tools/sensor-agent-installer.exe
 ```
 
 Without this file, `terraform apply` will fail when it tries to upload it to
 S3.
 
+You'll also need the Windows registry key path(s) the installer writes a
+registration marker to — Terraform polls these after launching it instead
+of waiting for the installer process to exit (it doesn't exit on its own).
+This is vendor-specific and has no default on purpose (see
+[Required: set your deployer name](#required-set-your-deployer-name) for
+the pattern — same idea, via `registration_registry_keys`):
+
+```bash
+export TF_VAR_registration_registry_keys='["HKLM:\\SOFTWARE\\WOW6432Node\\<Vendor>\\<Product>", "HKLM:\\SOFTWARE\\<Vendor>\\<Product>"]'
+```
+
 ## Setup
 
 ```bash
-git clone https://github.com/TimoWege/unified-Agent-Demo.git
-cd unified-Agent-Demo
+git clone https://github.com/TimoWege/Agent-Demo.git
+cd Agent-Demo
 
 # 1. Add the installer (see Prerequisites above)
 mkdir -p tools
-cp /path/to/TMSensorAgent_Windows_x86_64.exe tools/
+cp /path/to/your-installer.exe tools/sensor-agent-installer.exe
 
 # 2. Make sure AWS credentials are set up
 aws sts get-caller-identity
 
-# 3. Init & deploy (deployer is required - see below)
+# 3. Set the vendor-specific registration registry key(s) (see Prerequisites)
+export TF_VAR_registration_registry_keys='["HKLM:\\SOFTWARE\\WOW6432Node\\<Vendor>\\<Product>"]'
+
+# 4. Init & deploy (deployer is required - see below)
 terraform init
 terraform plan -var="deployer=alice" -out=tfplan
 terraform apply tfplan
@@ -151,7 +168,10 @@ terraform apply
 
 Other optional overrides: `aws_region` (default `eu-central-1`),
 `instance_type` (default `t3.medium`), `key_pair_name` (default
-`demo-key`).
+`demo-key`), `installer_local_path` (default `tools/sensor-agent-installer.exe`),
+`registration_value_name` (default `default_token_registered`).
+`registration_registry_keys` has no default and is required — see
+[Prerequisites](#the-sensor-agent-installer-not-included-in-this-repo).
 
 ## Using it
 

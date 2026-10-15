@@ -37,3 +37,20 @@ variable "hostname_2" {
   type        = string
   default     = "demo-2"
 }
+
+variable "installer_local_path" {
+  description = "Local path to the sensor agent installer executable (not included in this repo - see README). Its filename is reused as the S3 object key and the name it's saved under on the instance."
+  type        = string
+  default     = "tools/sensor-agent-installer.exe"
+}
+
+variable "registration_registry_keys" {
+  description = "Windows registry key path(s) to poll after launching the installer, used to detect successful registration. Vendor-specific and deliberately left without a default - set it in a local, uncommitted tfvars file or via TF_VAR_registration_registry_keys."
+  type        = list(string)
+}
+
+variable "registration_value_name" {
+  description = "Registry value name under registration_registry_keys that equals 1 once registration succeeds"
+  type        = string
+  default     = "default_token_registered"
+}

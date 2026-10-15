@@ -41,6 +41,9 @@ locals {
   iam_role_name          = "instance1-sensor-agent-s3-read-${var.deployer}"
   key_pair_name          = "${var.key_pair_name}-${var.deployer}"
   installers_bucket_name = "demo-installers-${data.aws_caller_identity.current.account_id}-${var.deployer}"
+
+  installer_filename   = basename(var.installer_local_path)
+  registration_keys_ps = join(",\n    ", [for k in var.registration_registry_keys : "\"${k}\""])
 }
 
 # --- Networking: use the account's default VPC/subnet for this demo ---
@@ -75,9 +78,9 @@ data "aws_ami" "windows" {
 
 data "aws_caller_identity" "current" {}
 
-# --- Installer staging: TMSensorAgent_Windows_x86_64.exe is uploaded to a private ---
-# --- S3 bucket; the first instance pulls it down via an IAM instance role and     ---
-# --- runs it.                                                                    ---
+# --- Installer staging: the sensor agent installer is uploaded to a private S3 ---
+# --- bucket; the first instance pulls it down via an IAM instance role and     ---
+# --- runs it.                                                                 ---
 
 resource "aws_s3_bucket" "installers" {
   bucket        = local.installers_bucket_name
@@ -94,9 +97,9 @@ resource "aws_s3_bucket_public_access_block" "installers" {
 
 resource "aws_s3_object" "sensor_agent" {
   bucket      = aws_s3_bucket.installers.id
-  key         = "TMSensorAgent_Windows_x86_64.exe"
-  source      = "${path.module}/tools/TMSensorAgent_Windows_x86_64.exe"
-  source_hash = filemd5("${path.module}/tools/TMSensorAgent_Windows_x86_64.exe")
+  key         = local.installer_filename
+  source      = "${path.module}/${var.installer_local_path}"
+  source_hash = filemd5("${path.module}/${var.installer_local_path}")
 }
 
 resource "aws_iam_role" "instance1_s3_read" {
@@ -201,9 +204,12 @@ resource "aws_instance" "instance1" {
     <powershell>
     ${file("${path.module}/scripts/bootstrap-openssh.ps1")}
     ${templatefile("${path.module}/scripts/install-sensor-agent.ps1.tftpl", {
-  bucket_name = aws_s3_bucket.installers.id
-  object_key  = aws_s3_object.sensor_agent.key
-  region      = var.aws_region
+  bucket_name             = aws_s3_bucket.installers.id
+  object_key              = aws_s3_object.sensor_agent.key
+  region                  = var.aws_region
+  installer_filename      = local.installer_filename
+  registration_keys_ps    = local.registration_keys_ps
+  registration_value_name = var.registration_value_name
 })}
     Rename-Computer -NewName "${var.hostname_1}" -Force -Restart
     </powershell>

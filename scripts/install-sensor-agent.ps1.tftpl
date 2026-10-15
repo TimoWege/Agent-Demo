@@ -1,23 +1,22 @@
-$installer = "C:\Temp\TMSensorAgent_Windows_x86_64.exe"
+$installer = "C:\Temp\${installer_filename}"
 New-Item -ItemType Directory -Path (Split-Path $installer) -Force | Out-Null
 Read-S3Object -BucketName "${bucket_name}" -Key "${object_key}" -File $installer -Region "${region}"
 
-# TMSensorAgent_Windows_x86_64.exe does not exit on its own - it keeps running as a
-# supervisor process (spawns Endpoint Basecamp worker processes indefinitely). So we
-# launch it without waiting for exit, and instead poll the registration marker it
-# writes to the registry (same approach the original V1ES/XBC install script used).
+# The installer does not exit on its own - it keeps running as a supervisor
+# process that spawns worker processes indefinitely. So we launch it without
+# waiting for exit, and instead poll the registration marker it writes to the
+# registry (the same way the vendor's own install script checks success).
 Start-Process -FilePath $installer
 
 $registrationKeys = @(
-    "HKLM:\SOFTWARE\WOW6432Node\TrendMicro\TMSecurityService",
-    "HKLM:\SOFTWARE\TrendMicro\TMSecurityService"
+    ${registration_keys_ps}
 )
 $maxRetry = 30
 $registered = $false
 for ($i = 0; $i -lt $maxRetry; $i++) {
     foreach ($key in $registrationKeys) {
-        $prop = Get-ItemProperty -Path $key -Name default_token_registered -ErrorAction SilentlyContinue
-        if ($prop -and $prop.default_token_registered -eq 1) {
+        $prop = Get-ItemProperty -Path $key -Name ${registration_value_name} -ErrorAction SilentlyContinue
+        if ($prop -and $prop.${registration_value_name} -eq 1) {
             $registered = $true
             break
         }
@@ -27,7 +26,7 @@ for ($i = 0; $i -lt $maxRetry; $i++) {
 }
 
 if ($registered) {
-    Write-Host "TMSensorAgent registered successfully."
+    Write-Host "Sensor agent registered successfully."
 } else {
-    Write-Host "TMSensorAgent did not report registration within the timeout - continuing anyway."
+    Write-Host "Sensor agent did not report registration within the timeout - continuing anyway."
 }
